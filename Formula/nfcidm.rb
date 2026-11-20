@@ -2,7 +2,6 @@ class Nfcidm < Formula
   desc "Read a FeliCa IDm with native macOS USB and PC/SC APIs"
   homepage "https://github.com/takesako/nfcidm"
   url "https://github.com/takesako/nfcidm/releases/download/v0.5.2/nfcidm-0.5.2.tar.gz"
-  version "0.5.2"
   sha256 "b36b4c8c99b42c36b6294c52799e0d6e5157f620853424a23115e4c98c8ba0a1"
   license "MIT"
 
