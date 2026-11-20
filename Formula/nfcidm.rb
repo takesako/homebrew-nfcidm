@@ -5,6 +5,12 @@ class Nfcidm < Formula
   sha256 "1d02b28f573628256e5ff3ba57c075a2d5559c2a490f56889a8d89b9aa39d792"
   license "MIT"
 
+  bottle do
+    root_url "https://github.com/takesako/homebrew-nfcidm/releases/download/nfcidm-0.5.4"
+    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "fe8a9c46202eb3d7587451be7e45e8d69de5e6d1aaf0624eee131baa27ae4153"
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "821ce3f02637f85494806b8267914ee3995b15d48b5557b770196ef842228bac"
+  end
+
   depends_on arch: :arm64
   depends_on macos: :sequoia
 
