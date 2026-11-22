@@ -10,7 +10,7 @@ brew trust --tap takesako/nfcidm
 brew install --force-bottle takesako/nfcidm/nfcidm
 ```
 
-The `brew trust --tap` command trusts all formulae and commands in this third-party tap. The `--force-bottle` option requires a compatible prebuilt bottle.
+`brew trust --tap` trusts all current and future formulae and commands in this third-party tap. `--force-bottle` requires a compatible prebuilt bottle; it does not fall back to building from source.
 
 ## Usage
 
@@ -20,30 +20,29 @@ nfcidm --list
 nfcidm
 ```
 
-For supported devices and other platforms, see the [nfcidm source repository](https://github.com/takesako/nfcidm).
+For supported readers and platform-specific instructions, see the [nfcidm source repository](https://github.com/takesako/nfcidm).
 
-## Maintainer guide: updating nfcidm
+## Maintainer guide: releasing a new version
 
-This repository contains the Homebrew formula (`Formula/nfcidm.rb`), its update script (`scripts/update-formula.sh`), and GitHub Actions for building and publishing bottles. Application source code and release tags are maintained separately in [takesako/nfcidm](https://github.com/takesako/nfcidm).
+The application source and release tags live in [takesako/nfcidm](https://github.com/takesako/nfcidm). This tap contains `Formula/nfcidm.rb`, `scripts/update-formula.sh`, and GitHub Actions workflows for building and publishing macOS bottles.
 
-### 1. Publish the upstream release first
+### 1. Publish the upstream release
 
-Commit and tag the new version in `takesako/nfcidm`, then publish its GitHub Release. The formula uses the automatically generated GitHub tag archive rather than a manually uploaded source tarball.
-
-Set the version for this release (example: `0.5.5`) and verify that it is publicly available:
+Release and tag the new version in the source repository *before* updating this tap. The formula uses the GitHub-generated tag archive, not a separately uploaded tarball. For example:
 
 ```sh
-VERSION=0.5.5
+VERSION=0.5.6  # replace with the next release version
 gh release view "v${VERSION}" -R takesako/nfcidm
 ```
 
-Do not move or reuse a published release tag. If a version has already been released with different source contents, increment the version instead.
+Never move an existing release tag. If the source changes after publication, release a new version.
 
-### 2. Update the formula in a branch
+### 2. Update the formula in a clean branch
 
-From a local clone of this tap:
+In a local clone of `takesako/homebrew-nfcidm`:
 
 ```sh
+git fetch origin
 git switch main
 git pull --ff-only
 git switch -c "nfcidm-${VERSION}"
@@ -54,15 +53,14 @@ git diff --check
 git diff -- Formula/nfcidm.rb
 ```
 
-The update script downloads the GitHub tag archive for the chosen version, computes its SHA-256 checksum, and updates the source `url` and `sha256` in `Formula/nfcidm.rb`.
+The script downloads the published tag archive, calculates its SHA-256 checksum, and updates the formula's `url` and `sha256`. Do not calculate the checksum from a locally generated archive. The publishing workflow handles bottle checksums.
 
-Do not copy the checksum from a locally generated archive. Bottle checksums are managed by the publishing workflow.
-
-### 3. Push and open a pull request
+### 3. Push and create a pull request
 
 ```sh
 git add Formula/nfcidm.rb
 git commit -m "nfcidm ${VERSION}"
+git log --oneline origin/main..HEAD
 git push -u origin "nfcidm-${VERSION}"
 
 gh pr create \
@@ -72,24 +70,33 @@ gh pr create \
   --body "Update nfcidm to v${VERSION}."
 ```
 
-If an existing open pull request already updates this release, push changes to that branch instead of creating a duplicate PR.
+Check that `git log --oneline origin/main..HEAD` contains **only commits intended for this release**. In particular, do not carry commits from an older, already integrated PR into the new branch: `brew pr-pull` cherry-picks the PR commits onto `main` and can fail on an already-applied (empty) cherry-pick.
 
-### 4. Wait for CI and bottle artifacts
+If a PR already exists for the version, update that PR's branch rather than opening a duplicate.
 
-The `tests.yml` workflow checks tap syntax and tests formula builds on the configured macOS runners.
-
-Confirm that the macOS 15 and macOS 26 jobs pass and that their bottle artifacts (`bottles_macos-15` and `bottles_macos-26`) have been uploaded.
+### 4. Check CI and bottle artifacts
 
 ```sh
 PR=$(gh pr view --json number --jq .number)
 gh pr checks "$PR" --watch
 ```
 
-**Do not merge the pull request manually before publishing the bottles.** The publishing workflow uses the PR and its CI artifacts together.
+Ensure that the `tests.yml` jobs for macOS 15 and macOS 26 pass **and** upload their bottle artifacts (currently `bottles_macos-15` and `bottles_macos-26`). Green checks alone do not prove that the required artifacts are available.
+
+To inspect the artifacts, find the latest PR test run ID and query its artifacts:
+
+```sh
+gh run list --workflow tests.yml --event pull_request --limit 10
+CI_RUN_ID=<run-id>
+gh api "repos/takesako/homebrew-nfcidm/actions/runs/${CI_RUN_ID}/artifacts" \
+  --jq '.artifacts[].name'
+```
+
+Do **not** merge the PR manually before bottle publication.
 
 ### 5. Publish the formula and bottles
 
-After CI succeeds, run the `publish.yml` workflow from the tap's `main` branch. Pin it to the reviewed PR head commit:
+Once both bottle jobs have succeeded, run `publish.yml` from `main` using the PR's **current** head SHA:
 
 ```sh
 SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
@@ -102,23 +109,38 @@ gh workflow run publish.yml \
 gh run list --workflow publish.yml --limit 5
 ```
 
-The workflow runs `brew pr-pull` to import the bottle artifacts, publish the updated formula, and complete the PR integration.
+Watch the new publishing run with `gh run watch <publish-run-id> --exit-status`. The workflow invokes `brew pr-pull` to import and publish the bottles and integrate the formula changes. Verify both the workflow result and the repository's `main` branch; do not assume publication succeeded merely because the workflow was started.
 
-If it reports `No artifacts with pattern bottles{,_*} found`, ensure that all bottle-build jobs finished successfully and uploaded their artifacts before retrying.
-
-### 6. Verify the published version
-
-On a macOS machine with a compatible bottle:
+### 6. Verify the release
 
 ```sh
+gh pr view "$PR" --json state,mergedAt
 brew update
-brew install --force-bottle takesako/nfcidm/nfcidm
+brew info takesako/nfcidm/nfcidm
+```
+
+Confirm that `brew info` shows the newly published version. For a fresh installation, use the commands in [Install](#install). For an existing installation, run:
+
+```sh
+brew upgrade --force-bottle takesako/nfcidm/nfcidm
 nfcidm --version
 ```
 
-For new installations, use the three commands in [Install](#install).
+### Troubleshooting publication
 
-If `brew install --force-bottle` fails because no bottle matches the local system, check the release's supported macOS versions and architectures and the published bottle artifacts.
+- **`The previous cherry-pick is now empty`**: The PR branch contains a commit already applied to `main`. Rebase the unpublished branch onto the latest `origin/main`, verify that only the intended release commits remain, and update the PR. Re-run CI and publish using the new head SHA:
+
+  ```sh
+  git fetch origin
+  git switch "nfcidm-${VERSION}"
+  git rebase origin/main
+  git log --oneline origin/main..HEAD
+  git push --force-with-lease origin "nfcidm-${VERSION}"
+  gh pr checks "$PR" --watch
+  ```
+
+- **`No artifacts with pattern bottles{,_*} found`**: Verify that the latest CI run for the *current PR SHA* produced both bottle artifacts. Do not reuse artifacts from an older PR commit.
+- **Missing bottle for this macOS version or architecture**: `--force-bottle` intentionally fails rather than building from source. Check the formula's published bottle definitions and the supported runners.
 
 ## References
 
