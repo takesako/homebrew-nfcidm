@@ -6,9 +6,9 @@ class Nfcidm < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/takesako/homebrew-nfcidm/releases/download/nfcidm-0.5.4"
-    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "fe8a9c46202eb3d7587451be7e45e8d69de5e6d1aaf0624eee131baa27ae4153"
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "821ce3f02637f85494806b8267914ee3995b15d48b5557b770196ef842228bac"
+    root_url "https://github.com/takesako/homebrew-nfcidm/releases/download/nfcidm-0.5.5"
+    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "c5176a7a1244baac8dd27843ac56c68b1e9c7f838b07cfaf6c5d48f274abbc32"
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "ee3320f79466541141ef76305e1b617caa68aead0ccbee593bf41294ab506107"
   end
 
   depends_on arch: :arm64
